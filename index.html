@@ -1,40 +1,772 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sıfırdan Satranç Oyunu</title>
-    
-    <!-- CSS Dosyamız -->
-    <link rel="stylesheet" href="style.css">
-    
-    <!-- Chessboard.js CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no, viewport-fit=cover">
+<title>SANTRANÇ PRO</title>
+<style>
+:root {
+    --board-bg: #b07c53;
+    --board-light: #e8c39e;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    background: #000000;
+    color: #fff;
+    user-select: none;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* --- İLK AÇILIŞ / GİRİŞ EKRANI (SPLASH SCREEN) --- */
+#splash-screen {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: #1a0f0a linear-gradient(135deg, #2c1608 0%, #000000 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.splash-stone-stack {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.splash-mini-piece {
+    font-size: 80px;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.7));
+}
+
+.splash-logo {
+    font-size: 32px;
+    font-weight: bold;
+    color: #e6c280;
+    text-shadow: 0 4px 10px rgba(0,0,0,0.9);
+    letter-spacing: 2px;
+    text-align: center;
+    z-index: 10;
+}
+
+/* --- TEPEDEKİ YENİLEN TAŞLAR HAVUZU --- */
+#top-container {
+    width: 100%;
+    max-width: 450px;
+    padding: 15px 15px 5px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 10;
+}
+.stone-pool {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    height: 28px;
+    gap: 3px;
+    background: rgba(255,255,255,0.03);
+    padding: 2px 8px;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.pool-stone-icon {
+    font-size: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+}
+
+#status-bar {
+    font-size: 14px;
+    background: rgba(43, 26, 12, 0.9);
+    color: #e6c280;
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid #5a330b;
+    margin: 4px auto 0 auto;
+    font-weight: bold;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+}
+
+/* --- TAHTA VE ÇERÇEVE --- */
+#board-container {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 10px;
+}
+#board-wrapper {
+    padding: 8px;
+    background: #4a2c11; 
+    border-radius: 8px;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.9);
+    border: 6px solid #2c1d11;
+}
+#board {
+    display: grid;
+    grid-template-columns: repeat(8, min(11.5vw, 5.5vh));
+    grid-template-rows: repeat(8, min(11.5vw, 5.5vh));
+    border: 2px solid #1a0f0a;
+}
+.cell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+}
+.light { background: var(--board-light); }
+.dark { background: var(--board-bg); }
+
+/* --- SATRANÇ TAŞLARI --- */
+.piece {
+    font-size: min(7.5vw, 4vh);
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+    transition: transform 0.1s ease;
+}
+.piece.w-piece { color: #f9e2ba; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+.piece.b-piece { color: #151515; text-shadow: 0 1px 2px rgba(255,255,255,0.2); }
+
+/* --- SEÇİM VE HAMLE İŞARETLERİ --- */
+.selected { outline: 3px solid #ffeb3b; outline-offset: -3px; z-index: 5; }
+.last-move-cell { box-shadow: inset 0 0 12px 5px rgba(241, 196, 15, 0.8); }
+.hint-move { position: absolute; width: 35%; height: 35%; background: rgba(46, 204, 113, 0.85); border-radius: 50%; pointer-events: none; }
+.hint-capture { position: absolute; width: 100%; height: 100%; background: rgba(231, 76, 60, 0.35); border: 3px solid #e74c3c; pointer-events: none; }
+
+/* --- GÜVENLİ ALAN PAYLI AHŞAP ALT BAR --- */
+#bottom-bar {
+    width: 100%;
+    height: 95px;
+    background: #3a1e0b linear-gradient(to bottom, #4a2912 0%, #2b1406 100%);
+    border-top: 3px solid #563118;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.9);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 12px 22px 12px;
+    z-index: 50;
+}
+.menu-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    width: 22%;
+    height: 100%;
+}
+.menu-btn:active { transform: scale(0.92); }
+.menu-btn-icon-circle {
+    width: 36px;
+    height: 36px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 16px;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* --- PARŞÖMEN PENCERELER (MODALS) --- */
+.modal-layer {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+.scroll-parchment {
+    background: #e6c280;
+    background-image: radial-gradient(circle, #f3dbab 0%, #d4a359 100%);
+    color: #311c07;
+    padding: 24px;
+    border-radius: 14px;
+    border: 4px solid #5a330b;
+    box-shadow: 0 0 25px rgba(0,0,0,0.9);
+    width: 320px;
+    text-align: center;
+    font-weight: bold;
+}
+.scroll-parchment h2 {
+    font-size: 24px;
+    margin-bottom: 12px;
+    border-bottom: 2px solid #5a330b;
+    padding-bottom: 4px;
+}
+.setup-row {
+    display: flex;
+    align-items: center;
+    margin: 12px 0;
+    font-size: 16px;
+}
+.setup-row input[type="checkbox"] {
+    width: 22px; height: 22px;
+    margin-right: 12px;
+    accent-color: #5a330b;
+}
+
+.range-wrap { margin: 14px 0; text-align: left; }
+.range-wrap label { font-size: 15px; display: block; margin-bottom: 4px; }
+input[type="range"] { width: 100%; accent-color: #5a330b; cursor: pointer; }
+.range-labels { display: flex; justify-content: space-between; font-size: 12px; color: #5a330b; margin-top: 2px; }
+
+.stone-pick-flex { display: flex; justify-content: space-around; margin: 15px 0; }
+.stone-pick-box {
+    width: 80px; height: 80px;
+    border: 3px solid #5a330b;
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    background: rgba(255,255,255,0.2);
+}
+.stone-pick-box.selected-pick { outline: 4px solid #2ecc71; background: rgba(46, 204, 113, 0.3); }
+.stone-pick-box .inner-stone { font-size: 36px; display: flex; justify-content: center; align-items: center; }
+
+.action-submit {
+    background: #5a330b;
+    color: #fff;
+    border: none;
+    padding: 12px;
+    font-size: 17px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+    margin-top: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+</style>
 </head>
 <body>
 
-    <div class="game-container">
-        <h1>JavaScript Satranç</h1>
-        <!-- Satranç Tahtasının Duracağı Alan -->
-        <div id="board" style="width: 400px"></div>
-        <div class="status-panel">
-            <p>Durum: <span id="status">Oyun Başladı</span></p>
-            <p>Sıra: <span id="turn">Beyaz</span></p>
-            <button id="resetBtn">Yeniden Başlat</button>
-        </div>
+<div id="splash-screen">
+    <div class="splash-stone-stack">
+        <div class="splash-mini-piece">♔</div>
     </div>
+    <div class="splash-logo">SANTRANÇ PRO</div>
+</div>
 
-    <!-- jQuery (Gerekli bağımlılık) -->
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<div id="top-container">
+    <div class="stone-pool" id="pool-blacks"></div>
+    <div class="stone-pool" id="pool-whites"></div>
+    <div id="status-bar">Yükleniyor...</div>
+</div>
+
+<div id="board-container">
+    <div id="board-wrapper">
+        <div id="board"></div>
+    </div>
+</div>
+
+<div id="bottom-bar">
+    <button class="menu-btn" onclick="openModal('newgame-pop')">
+        <div class="menu-btn-icon-circle">▶</div><span>Yeni</span>
+    </button>
+    <button class="menu-btn" onclick="openModal('settings-pop')">
+        <div class="menu-btn-icon-circle">⚙</div><span>Ayarlar</span>
+    </button>
+    <button class="menu-btn" onclick="openModal('mainmenu-pop')">
+        <div class="menu-btn-icon-circle">☰</div><span>Menü</span>
+    </button>
+</div>
+
+<div id="newgame-pop" class="modal-layer" style="display: none;">
+    <div class="scroll-parchment">
+        <h2>Yeni oyun</h2>
+        <div class="setup-row">
+            <input type="checkbox" id="bot-active" checked>
+            <label for="bot-active">Tek oyuncu (Bot'a Karşı)</label>
+        </div>
+        <p style="margin-top: 10px;">Taş Rengini Seç</p>
+        <div class="stone-pick-flex">
+            <div class="stone-pick-box selected-pick" id="pick-w" onclick="selectSide('white')">
+                <div class="inner-stone">♔</div>
+            </div>
+            <div class="stone-pick-box" id="pick-b" onclick="selectSide('black')">
+                <div class="inner-stone">♚</div>
+            </div>
+        </div>
+        <button class="action-submit" onclick="startNewGame()">Oyunu Başlat</button>
+    </div>
+</div>
+
+<div id="settings-pop" class="modal-layer" style="display: none;">
+    <div class="scroll-parchment">
+        <h2>Ayarlar</h2>
+        <div class="range-wrap">
+            <label>Bot Zorluk Derecesi</label>
+            <input type="range" id="bot-tier" min="1" max="3" value="2">
+            <div class="range-labels"><span>Kolay</span><span>Normal</span><span>Zor</span></div>
+        </div>
+        <div class="setup-row"><input type="checkbox" id="opt-lastmove" checked><label>Son hamleyi göster</label></div>
+        <div class="setup-row"><input type="checkbox" id="opt-hints" checked><label>Gidilecek kareleri işaretle</label></div>
+        <div class="setup-row"><input type="checkbox" id="opt-frame" checked onchange="applyFrameSettings()"><label>Tahta çerçevesini göster</label></div>
+        <div class="setup-row"><input type="checkbox" id="opt-audio" checked><label>Sesleri çal</label></div>
+        <button class="action-submit" onclick="closeModal('settings-pop')">Ayarları Kaydet</button>
+    </div>
+</div>
+
+<div id="gameover-pop" class="modal-layer" style="display: none;">
+    <div class="scroll-parchment" style="border-color: #2ecc71;">
+        <h2 style="color: #2ecc71; border-bottom-color: #2ecc71;">Oyun Bitti</h2>
+        <p id="gameover-message" style="margin: 20px 0; font-size: 18px; color: #1a0f0a;"></p>
+        <button class="action-submit" style="background: #2ecc71;" onclick="closeModal('gameover-pop'); openModal('newgame-pop');">Yeni Oyun</button>
+    </div>
+</div>
+
+<div id="mainmenu-pop" class="modal-layer" style="display: none;">
+    <div class="scroll-parchment">
+        <h2>Ana Menü</h2>
+        <button class="action-submit" onclick="closeModal('mainmenu-pop')">Oyuna Dön</button>
+        <button class="action-submit" style="background:#8c2d19;" onclick="location.reload()">Sayfayı Yenile</button>
+    </div>
+</div>
+
+<div id="alert-pop" class="modal-layer" style="display: none;">
+    <div class="scroll-parchment" style="border-color: #8c2d19;">
+        <h2 style="color: #8c2d19; border-bottom-color: #8c2d19;">Sistem Uyarısı</h2>
+        <p id="alert-message" style="margin: 20px 0; font-size: 15px;"></p>
+        <button class="action-submit" style="background: #8c2d19;" onclick="closeModal('alert-pop')">Kapat</button>
+    </div>
+</div>
+
+<script>
+let audioCtx = null;
+function playAudio(type) {
+    if (!document.getElementById("opt-audio").checked) return;
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+
+        if (type === "move") {
+            osc.frequency.setValueAtTime(280, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.06);
+        } else if (type === "eat") {
+            osc.frequency.setValueAtTime(420, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(160, audioCtx.currentTime + 0.14);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.14);
+        } else if (type === "check") {
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(350, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+        }
+    } catch(e) { console.log("Ses hatası", e); }
+}
+
+const PIECES = {
+    P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔',
+    p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚'
+};
+
+let board = [];
+let activeTurn = "white";
+let playerColor = "white";
+let isSinglePlayer = true;
+let selectedPos = null;
+let lastExecutedMove = null;
+let deadWhites = [];
+let deadBlacks = [];
+
+function openModal(id) { document.getElementById(id).style.display = "flex"; }
+function closeModal(id) { document.getElementById(id).style.display = "none"; }
+
+function selectSide(color) {
+    playerColor = color;
+    document.getElementById("pick-w").classList.remove("selected-pick");
+    document.getElementById("pick-b").classList.remove("selected-pick");
+    document.getElementById(color === "white" ? "pick-w" : "pick-b").classList.add("selected-pick");
+}
+
+function applyFrameSettings() {
+    let show = document.getElementById("opt-frame").checked;
+    document.getElementById("board-wrapper").style.border = show ? "6px solid #2c1d11" : "none";
+}
+
+function showCustomAlert(msg) {
+    document.getElementById("alert-message").textContent = msg;
+    openModal('alert-pop');
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        let splash = document.getElementById("splash-screen");
+        splash.style.opacity = "0";
+        setTimeout(() => {
+            splash.style.display = "none";
+            openModal('newgame-pop');
+        }, 500);
+    }, 2000);
+});
+
+function startNewGame() {
+    isSinglePlayer = document.getElementById("bot-active").checked;
+    closeModal('newgame-pop');
     
-    <!-- Chess.js (Satranç kuralları motoru) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    board = [
+        ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
+        ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+        ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
+    ];
+    activeTurn = "white";
+    selectedPos = null;
+    lastExecutedMove = null;
+    deadWhites = [];
+    deadBlacks = [];
+
+    applyFrameSettings();
+    updateTopPools();
+    renderBoard();
+    if(isSinglePlayer && activeTurn !== playerColor) {
+        setTimeout(triggerBotIntelligence, 600);
+    }
+}
+
+function updateTopPools() {
+    let pWhites = document.getElementById("pool-whites");
+    let pBlacks = document.getElementById("pool-blacks");
+    if(!pWhites || !pBlacks) return;
     
-    <!-- Chessboard.js (Görsel tahta) -->
-    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    pWhites.innerHTML = ""; pBlacks.innerHTML = "";
     
-    <!-- Kendi Mantık Kodumuz -->
-    <script src="script.js"></script>
+    deadBlacks.forEach(p => {
+        let d = document.createElement("div"); d.className = "pool-stone-icon b-piece"; d.textContent = PIECES[p];
+        pWhites.appendChild(d);
+    });
+    deadWhites.forEach(p => {
+        let d = document.createElement("div"); d.className = "pool-stone-icon w-piece"; d.textContent = PIECES[p];
+        pBlacks.appendChild(d);
+    });
+}
+
+function isInBounds(r, c) { return r >= 0 && r < 8 && c >= 0 && c < 8; }
+function isWhitePiece(p) { return p && p === p.toUpperCase(); }
+function isBlackPiece(p) { return p && p === p.toLowerCase(); }
+
+function getRawMoves(r, c, currentBoard) {
+    let p = currentBoard[r][c];
+    if(!p) return [];
+    let moves = [];
+    let white = isWhitePiece(p);
+
+    if(p.toLowerCase() === 'p') {
+        let dir = white ? -1 : 1;
+        let startRow = white ? 6 : 1;
+        let nr = r + dir;
+        if(isInBounds(nr, c) && !currentBoard[nr][c]) {
+            moves.push({r: nr, c: c});
+            let nnr = r + dir * 2;
+            if(r === startRow && isInBounds(nnr, c) && !currentBoard[nnr][c]) {
+                moves.push({r: nnr, c: c});
+            }
+        }
+        for(let dc of [-1, 1]) {
+            let nc = c + dc;
+            if(isInBounds(nr, nc)) {
+                let target = currentBoard[nr][nc];
+                if(target && white !== isWhitePiece(target)) {
+                    moves.push({r: nr, c: nc});
+                }
+            }
+        }
+    } else if(p.toLowerCase() === 'n') {
+        let knightMoves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+        for(let [dr, dc] of knightMoves) {
+            let nr = r + dr, nc = c + dc;
+            if(isInBounds(nr, nc)) {
+                let target = currentBoard[nr][nc];
+                if(!target || white !== isWhitePiece(target)) {
+                    moves.push({r: nr, c: nc});
+                }
+            }
+        }
+    } else if(p.toLowerCase() === 'b' || p.toLowerCase() === 'r' || p.toLowerCase() === 'q') {
+        let dirs = [];
+        if(p.toLowerCase() === 'b' || p.toLowerCase() === 'q') dirs.push([-1,-1],[-1,1],[1,-1],[1,1]);
+        if(p.toLowerCase() === 'r' || p.toLowerCase() === 'q') dirs.push([-1,0],[1,0],[0,-1],[0,1]);
+        for(let [dr, dc] of dirs) {
+            let nr = r + dr, nc = c + dc;
+            while(isInBounds(nr, nc)) {
+                let target = currentBoard[nr][nc];
+                if(!target) {
+                    moves.push({r: nr, c: nc});
+                } else {
+                    if(white !== isWhitePiece(target)) moves.push({r: nr, c: nc});
+                    break;
+                }
+                nr += dr; nc += dc;
+            }
+        }
+    } else if(p.toLowerCase() === 'k') {
+        let kingMoves = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+        for(let [dr, dc] of kingMoves) {
+            let nr = r + dr, nc = c + dc;
+            if(isInBounds(nr, nc)) {
+                let target = currentBoard[nr][nc];
+                if(!target || white !== isWhitePiece(target)) {
+                    moves.push({r: nr, c: nc});
+                }
+            }
+        }
+    }
+    return moves;
+}
+
+function findKing(color, currentBoard) {
+    let kingChar = color === 'white' ? 'K' : 'k';
+    for(let r=0; r<8; r++) {
+        for(let c=0; c<8; c++) {
+            if(currentBoard[r][c] === kingChar) return {r, c};
+        }
+    }
+    return null;
+}
+
+function isSquareAttacked(r, c, attackerColor, currentBoard) {
+    for(let i=0; i<8; i++) {
+        for(let j=0; j<8; j++) {
+            let p = currentBoard[i][j];
+            if(p && (attackerColor === 'white' ? isWhitePiece(p) : isBlackPiece(p))) {
+                let moves = getRawMoves(i, j, currentBoard);
+                if(moves.some(m => m.r === r && m.c === c)) return true;
+            }
+        }
+    }
+    return false;
+}
+
+function isInCheck(color, currentBoard) {
+    let kPos = findKing(color, currentBoard);
+    if(!kPos) return true;
+    let attacker = color === 'white' ? 'black' : 'white';
+    return isSquareAttacked(kPos.r, kPos.c, attacker, currentBoard);
+}
+
+function getLegalMoves(r, c) {
+    let p = board[r][c];
+    if(!p) return [];
+    let whiteTurn = activeTurn === 'white';
+    if(whiteTurn !== isWhitePiece(p)) return [];
+
+    let raw = getRawMoves(r, c, board);
+    let legal = [];
+    for(let m of raw) {
+        let tempBoard = board.map(row => [...row]);
+        tempBoard[m.r][m.c] = tempBoard[r][c];
+        tempBoard[r][c] = '';
+        if(!isInCheck(activeTurn, tempBoard)) {
+            legal.push(m);
+        }
+    }
+    return legal;
+}
+
+function getAllLegalMoves(color, currentBoard) {
+    let all = [];
+    for(let r=0; r<8; r++) {
+        for(let c=0; c<8; c++) {
+            let p = currentBoard[r][c];
+            if(p && (color === 'white' ? isWhitePiece(p) : isBlackPiece(p))) {
+                let raw = getRawMoves(r, c, currentBoard);
+                for(let m of raw) {
+                    let tempBoard = currentBoard.map(row => [...row]);
+                    tempBoard[m.r][m.c] = tempBoard[r][c];
+                    tempBoard[r][c] = '';
+                    if(!isInCheck(color, tempBoard)) {
+                        all.push({from: {r, c}, to: m});
+                    }
+                }
+            }
+        }
+    }
+    return all;
+}
+
+function checkGameEndConditions() {
+    let allMoves = getAllLegalMoves(activeTurn, board);
+    if(allMoves.length === 0) {
+        if(isInCheck(activeTurn, board)) {
+            let winner = activeTurn === 'white' ? 'Siyah' : 'Beyaz';
+            document.getElementById("gameover-message").textContent = `Şah Mat! ${winner} Kazandı!`;
+        } else {
+            document.getElementById("gameover-message").textContent = "Oyun Berabere (Pat)!";
+        }
+        openModal("gameover-pop");
+        return true;
+    }
+    return false;
+}
+
+function renderBoard() {
+    let bEl = document.getElementById("board");
+    if(!bEl) return;
+    bEl.innerHTML = "";
+    let showHints = document.getElementById("opt-hints") ? document.getElementById("opt-hints").checked : true;
+    let showLastMove = document.getElementById("opt-lastmove") ? document.getElementById("opt-lastmove").checked : true;
+
+    for(let r=0; r<8; r++) {
+        for(let c=0; c<8; c++) {
+            let square = document.createElement("div");
+            square.className = "cell " + ((r + c) % 2 ? "dark" : "light");
+
+            if(selectedPos && selectedPos.r === r && selectedPos.c === c) square.classList.add("selected");
+            if(showLastMove && lastExecutedMove && ((lastExecutedMove.from.r === r && lastExecutedMove.from.c === c) || (lastExecutedMove.to.r === r && lastExecutedMove.to.c === c))) {
+                square.classList.add("last-move-cell");
+            }
+
+            let token = board[r][c];
+            if(token) {
+                let pDiv = document.createElement("div");
+                pDiv.className = `piece ${isWhitePiece(token) ? 'w-piece' : 'b-piece'}`;
+                pDiv.textContent = PIECES[token];
+                square.appendChild(pDiv);
+            }
+
+            if(selectedPos && showHints) {
+                let validMoves = getLegalMoves(selectedPos.r, selectedPos.c);
+                let hit = validMoves.find(m => m.r === r && m.c === c);
+                if(hit) {
+                    let indicator = document.createElement("div");
+                    indicator.className = board[r][c] ? "hint-capture" : "hint-move";
+                    square.appendChild(indicator);
+                }
+            }
+            square.onclick = () => handleSquareClick(r, c);
+            bEl.appendChild(square);
+        }
+    }
+    let sideText = activeTurn === "white" ? "Beyaz" : "Siyah";
+    let modeText = (isSinglePlayer && activeTurn !== playerColor) ? "(Bot Oynuyor...)" : "(Sizde)";
+    let checkText = isInCheck(activeTurn, board) ? " - ŞAH!" : "";
+    document.getElementById("status-bar").textContent = `Sıra: ${sideText} ${modeText}${checkText}`;
+}
+
+function handleSquareClick(r, c) {
+    if(isSinglePlayer && activeTurn !== playerColor) return;
+    let clickedToken = board[r][c];
+    let whiteTurn = activeTurn === 'white';
+
+    if(clickedToken && whiteTurn === isWhitePiece(clickedToken)) {
+        selectedPos = { r, c };
+        renderBoard();
+        return;
+    }
+
+    if(!selectedPos) return;
+
+    let legals = getLegalMoves(selectedPos.r, selectedPos.c);
+    let matched = legals.find(m => m.r === r && m.c === c);
+    if(!matched) return;
+
+    executeMove(selectedPos, matched);
+}
+
+function executeMove(from, to) {
+    let movingPiece = board[from.r][from.c];
+    let targetPiece = board[to.r][to.c];
+
+    if(targetPiece) {
+        if(isWhitePiece(targetPiece)) deadWhites.push(targetPiece);
+        else deadBlacks.push(targetPiece);
+        playAudio("eat");
+    } else {
+        playAudio("move");
+    }
+
+    board[to.r][to.c] = movingPiece;
+    board[from.r][from.c] = '';
+
+    // Piyon Terfisi (Promotion)
+    if(movingPiece === 'P' && to.r === 0) board[to.r][to.c] = 'Q';
+    if(movingPiece === 'p' && to.r === 7) board[to.r][to.c] = 'q';
+
+    lastExecutedMove = { from: {r: from.r, c: from.c}, to: {r: to.r, c: to.c} };
+    selectedPos = null;
+
+    updateTopPools();
+
+    activeTurn = (activeTurn === "white") ? "black" : "white";
+
+    if(isInCheck(activeTurn, board)) {
+        playAudio("check");
+    }
+
+    renderBoard();
+
+    if(checkGameEndConditions()) return;
+
+    if(isSinglePlayer && activeTurn !== playerColor) {
+        setTimeout(triggerBotIntelligence, 600);
+    }
+}
+
+function triggerBotIntelligence() {
+    let allMoves = getAllLegalMoves(activeTurn, board);
+    if(allMoves.length === 0) {
+        checkGameEndConditions();
+        return;
+    }
+
+    let tier = parseInt(document.getElementById("bot-tier").value);
+    let chosenMove = allMoves[0];
+
+    if(tier === 1) {
+        chosenMove = allMoves[Math.floor(Math.random() * allMoves.length)];
+    } else {
+        let captureMoves = allMoves.filter(m => board[m.to.r][m.to.c] !== '');
+        if(captureMoves.length > 0 && tier >= 2) {
+            chosenMove = captureMoves[Math.floor(Math.random() * captureMoves.length)];
+        } else {
+            chosenMove = allMoves[Math.floor(Math.random() * allMoves.length)];
+        }
+    }
+
+    executeMove(chosenMove.from, chosenMove.to);
+}
+</script>
 </body>
 </html>
-
